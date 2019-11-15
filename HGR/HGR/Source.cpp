@@ -4,7 +4,7 @@ using namespace cv;
 int main()
 {
 	Mat image, greyimg,binarized;
-	char *imagename = (char*)"gesture.jpg";
+	char *imagename = (char*)"Images\\fist.jpg";
 
 
 	image = imread(imagename, cv::IMREAD_COLOR);   // Read the file

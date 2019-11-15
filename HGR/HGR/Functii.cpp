@@ -5,7 +5,7 @@ Mat binarize(Mat image)
 	double min, max;
 	minMaxIdx(image, &min, &max);
 	Mat binarized;
-	int Threshold = (int)(min + max) / 2;//i-am facut cast sa scap de warningu de loss of data 
+	int threshVal = (int)(min + max) / 2;//i-am facut cast sa scap de warningu de loss of data 
 
 	do {
 
@@ -21,13 +21,13 @@ Mat binarize(Mat image)
 			for (int y = 0; y < image.cols; y++) {
 
 				// Accesssing values of each pixel
-				if (image.at<uchar>(x, y) >= Threshold) {
+				if (image.at<uchar>(x, y) >= threshVal) {
 
 					m1 += image.at<uchar>(x, y);
 					++counter1;
 
 				}
-				else if (image.at<uchar>(x, y) < Threshold) {
+				else if (image.at<uchar>(x, y) < threshVal) {
 
 					m2 += image.at<uchar>(x, y);
 					++counter2;
@@ -40,13 +40,13 @@ Mat binarize(Mat image)
 
 		int threshold1 = (int)(m1 + m2) / 2;
 
-		if (Threshold == threshold1)
+		if (threshVal == threshold1)
 			break;
-		Threshold = threshold1;
+		threshVal = threshold1;
 	} while (1);
 
 	
-	threshold(image, binarized, Threshold, 255, THRESH_BINARY_INV);
+	threshold(image, binarized, threshVal, 255, THRESH_BINARY_INV);
 	return binarized;
 
 }
