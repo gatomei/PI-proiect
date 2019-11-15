@@ -1,25 +1,28 @@
-#include <iostream>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include "Functii.h"
 
 using namespace cv;
 int main()
 {
-	Mat image, greyimg;
+	Mat image, greyimg,binarized;
 	char *imagename = (char*)"gesture.jpg";
-	image = imread(imagename, CV_LOAD_IMAGE_COLOR);   // Read the file
+
+
+	image = imread(imagename, cv::IMREAD_COLOR);   // Read the file
 
 	if (!image.data)                              // Check for invalid input
 	{
 		std::cout << "Could not open or find the image" << std::endl;
 		return -1;
 	}
-	cvtColor(image, greyimg, COLOR_BGR2GRAY);
+	cvtColor(image, greyimg, COLOR_BGR2GRAY); //conv from color to grayscale image
 
-	namedWindow("Display window", WINDOW_AUTOSIZE);// Create a window for display.
-	//imshow("Display window", image);   // Show our image inside it.
-	imshow("Display window", greyimg);
+	imshow("Grey", greyimg);
+
+	binarized = binarize(greyimg);
+
+	imshow("Binary",binarized);
+
 	waitKey(0);                                          // Wait for a keystroke in the window
+
 	return 0;
 }
