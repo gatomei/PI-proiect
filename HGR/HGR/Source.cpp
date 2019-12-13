@@ -1,28 +1,34 @@
 #include "Functii.h"
 
-using namespace cv;
+
 int main()
 {
-	Mat image, greyimg,binarized;
-	char *imagename = (char*)"Images\\fist.jpg";
+	string palma = "Images\\palma\\p";
+	vector<Mat> palmImg = prepareInputData(palma);
+	
+	string like = "Images\\like\\l";
+	vector<Mat> likeImg = prepareInputData(like);
 
+	Mat palmDescriptors = computeHog(palmImg);
+	Mat likeDescriptors = computeHog(likeImg);
 
-	image = imread(imagename, cv::IMREAD_COLOR);   // Read the file
+	//concatenate descriptors for all types of images into a vector
+	vector<Mat> Descriptors;
+	Descriptors.push_back(palmDescriptors); 
+	Descriptors.push_back(likeDescriptors);
+	
+	vector<int> labels;
+	Mat inputTrain;
+	shuffleData(Descriptors, inputTrain, labels);
 
-	if (!image.data)                              // Check for invalid input
-	{
-		std::cout << "Could not open or find the image" << std::endl;
-		return -1;
-	}
-	cvtColor(image, greyimg, COLOR_BGR2GRAY); //conv from color to grayscale image
+	Ptr<SVM> svm = trainSvm(inputTrain, labels);
 
-	imshow("Grey", greyimg);
+	//test
+	string testFilename = "Images\\test\\testPalm.jpg";
+	int result = predictGestureType(testFilename, svm);
+	interpretateResult(result);
 
-	binarized = binarize(greyimg);
-
-	imshow("Binary",binarized);
-
-	waitKey(0);                                          // Wait for a keystroke in the window
-
+	waitKey(0);
+	system("pause");
 	return 0;
 }

@@ -1,5 +1,11 @@
 #include "Functii.h"
-using namespace cv;
+
+const int nrImgs = 13;
+const int noGestures = 2;
+//const int label_palm = 0;
+//const int label_like = 1;
+enum labels { label_palm, label_like};
+
 Mat binarize(Mat image)
 {
 	double min, max;
@@ -50,121 +56,125 @@ Mat binarize(Mat image)
 	return binarized;
 
 }
+vector<Mat> prepareInputData(string filename)
+{
+	vector<Mat> images;
+	for (int j = 0; j < nrImgs; ++j)
+	{
+		string pumn = filename;
+		string no = std::to_string(j + 1).append(".jpg");
+		Mat temp_img = imread(pumn.append(no), cv::IMREAD_COLOR);
+		Mat dst;
+		resize(temp_img, dst, Size(200, 400));
+		Mat grayImg;
+		cvtColor(dst, grayImg, COLOR_BGR2GRAY);
+		images.push_back(grayImg);
 
-void calcMagAng(Mat img, Mat& magnitude, Mat &angle) {
-
-	Mat Gx, Gy;
-
-	//setez dx = 1, dy = 0, k_size = 1 
-	//k_size=width && height of the filter mask
-	Sobel(img, Gx, CV_32F, 1, 0, 1);
-
-	//setez dx = 0, dy = 1, k_size = 1
-	Sobel(img, Gy, CV_32F, 0, 1, 1);
-
-	cartToPolar(Gx, Gy, magnitude, angle, true);// setez ca magnitudinea si unghiul sa se masoare in grade(ultimul param)
-	
+	}
+	return images;
 }
 
-Mat HOG(Mat magnitude, Mat angle, int featureDimension) {
+Mat computeHog(vector<Mat> inputData)
+{
+	HOGDescriptor hog(
+		Size(64, 64), //winSize
+		Size(8, 8), //blocksize
+		Size(8, 8), //blockStride,
+		Size(8, 8), //cellSize,
+		9, //nbins,
+		1, //derivAper,
+		-1, //winSigma,
+		0, //histogramNormType,
+		0.2, //L2HysThresh,
+		0,//gammal correction,
+		64,//nlevels=64
+		1);
+	Mat imgDescriptors;
+	for (auto iter = inputData.begin(); iter < inputData.end(); ++iter)
+	{
 
-
-	Mat features(1, featureDimension, CV_32F); // CV_32F ->valPixel va apartine [0,1.0]
-	features = 0.0;
-
-	float binLen = 360 / float(featureDimension);
-
-	float* limits = new float[featureDimension]; 
-	float* medlimits = new float[featureDimension];
-
-	int rows = magnitude.rows;
-	int cols = magnitude.cols;
-
-	int indx;//indexul la care vom adauga in vector produsul proportion*magnitude
-	int sideIndx;// indexul vecin lui indx
-
-	float difference;
-	float proportion;//proportion = 1 - difference / binLen
-
-	float val; // valoarea pe care o voi insera pe poz indx
-	float sideVal; //valorea pe care o voi insera pe poz sideIndx
-
-	if ((magnitude.rows != angle.rows) || (magnitude.cols != angle.cols)) {
-
-		cerr << "Dimensiunile matricelor dimension si angle trebuie sa corespunda!\n";
-		exit(0);
+		vector< float > descriptors;
+		hog.compute(*iter, descriptors, hog.winSize);
+		imgDescriptors.push_back(Mat(descriptors).t());
 
 	}
+	return imgDescriptors;
+}
+void shuffleData(vector<Mat> input, Mat &inputTrain, vector<int> &labels)
+{
+	int p = nrImgs;
+	int l = nrImgs;
+	int i = 0;
+	while (p > 0 || l > 0) {
 
-	limits[0] = binLen / 2;
-	medlimits[0] = 0;
-	for (int i = 1; i < featureDimension; ++i) {
+		if (i % 2 && p > 2) {
 
-		limits[i] = limits[i - 1] + binLen;
-		medlimits[i] = i * binLen;// medlimits[i] = ( limits[i-1] + limits[i] ) / 2 , i>=1
-	}
+			p--;
+			inputTrain.push_back(input[0].row(p));
+			p--;
+			inputTrain.push_back(input[0].row(p));
 
-	for (int i = 0; i < rows; ++i) {
+			i++;
+			labels.push_back(label_palm);
+			labels.push_back(label_palm);
 
-		for (int j = 0; j < cols; ++j) {
+		}
+		else if (l > 0) {
 
-			float angleVal = angle.at<float>(i, j);
-			float magVal = magnitude.at<float>(i, j);
+			l--;
+			inputTrain.push_back(input[1].row(l));
+			i++;
 
-			
-			if (angleVal <= limits[0] || angleVal >= limits[featureDimension - 1]) {
-
-				indx = 0;
-
-				//verific daca angleVal este mai mare decat 0 si mai mic decat prima limita a vectorului limits
-				if (angleVal >= medlimits[0] && angleVal <= limits[0]) { 
-
-					difference = angleVal;
-					sideIndx = 1;
-
-				}
-				else {
-
-					//in acest caz angleVal e mai mic decat 360 de grade si mai mare decat ultima limita a vectorului limits
-					difference = abs(angleVal - 360);
-					sideIndx = featureDimension - 1;
-				}
-			}
-			else {
-				//tratez restul cazurilor
-				for (int k = 0; k < featureDimension - 1; k++)
-				{
-					if (angleVal >= limits[k] && angleVal < limits[k + 1]) {
-						
-							difference = abs(angleVal - medlimits[k + 1]);
-							indx = k + 1;
-
-							if (angleVal >= medlimits[k + 1]) {
-
-								if ((k + 1) == featureDimension - 1)
-									sideIndx = 0;
-								else
-									sideIndx = k + 2;
-							}
-							else {
-								sideIndx = k;
-							}
-
-						break;
-					}
-				}
-			}
-			proportion = 1 - difference / binLen;
-
-			val = proportion * magVal;
-			sideVal = (1.f - proportion) * magVal;
-
-			features.at<float>(0, indx) += val;
-			features.at<float>(0, sideIndx) += sideVal;
+			labels.push_back(label_like);
+		}
+		if (p > 0 && l == 0) {
+			--p;
+			inputTrain.push_back(input[1].row(p));
+			labels.push_back(label_palm);
 
 		}
 	}
+}
 
-	return features;
+Ptr<SVM> trainSvm(Mat inputTrain, vector<int> labels)
+{
+	Ptr<SVM> svm = SVM::create();
+	svm->setType(SVM::C_SVC);
+	svm->setKernel(SVM::LINEAR);
+	svm->setC(10);
+	svm->setTermCriteria(cvTermCriteria(CV_TERMCRIT_ITER + CV_TERMCRIT_EPS, 1000, 1e-6));
 
+	svm->train(inputTrain, ROW_SAMPLE, Mat(labels));
+	return svm;
+
+}
+
+int predictGestureType(string filename, Ptr<SVM> trainedSvm)
+{
+	Mat test_Img = imread(filename, cv::IMREAD_COLOR);
+	Mat dst;
+	resize(test_Img, dst, Size(200, 400));
+	Mat grayImg;
+	cvtColor(dst, grayImg, COLOR_BGR2GRAY);
+	Mat testF;
+	vector<Mat> input;
+	input.push_back(grayImg);
+	testF = computeHog(input);
+	int result = trainedSvm->predict(testF);
+	return result;
+
+}
+
+void interpretateResult(int result)
+{
+	switch (result)
+	{
+	case 0:
+		cout << "Imaginea data reprezinta o palma" << endl;
+		break;
+	case 1:
+		cout << "Imaginea data reprezinta semnul like" << endl;
+		break;
+
+	}
 }
